@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tubig — find water near you</title>
+<meta name="theme-color" content="#0B7699">
+<meta name="description" content="Find water sources near you in the Philippines. Works offline.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E6EDEF; --card:#F6F9FA; --ink:#0E2A3A; --muted:#4F6672; --line:#C3D1D6;
+  --water:#0B7699; --water-soft:#D2E8EF; --safe:#2C7A4B; --safe-soft:#D8EEDF;
+  --warn:#9A6408; --warn-soft:#F5E7C8; --bad:#A33A2A; --bad-soft:#F4DAD5; --you:#C8432B;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0C1B24; --card:#13262F; --ink:#E3EEF1; --muted:#93AAB4; --line:#24404C;
+  --water:#45B7DA; --water-soft:#123744; --safe:#6FCB93; --safe-soft:#143323; --warn:#E5B25A; --warn-soft:#3A2D12;
+  --bad:#F08C7A; --bad-soft:#3B1C17; --you:#FF7A5C; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --paper:#0C1B24; --card:#13262F; --ink:#E3EEF1; --muted:#93AAB4; --line:#24404C;
+  --water:#45B7DA; --water-soft:#123744; --safe:#6FCB93; --safe-soft:#143323; --warn:#E5B25A; --warn-soft:#3A2D12;
+  --bad:#F08C7A; --bad-soft:#3B1C17; --you:#FF7A5C; color-scheme:dark;}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 Barlow,system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:20px 16px 48px}
+h1{font:700 2.6rem/1 "Barlow Condensed",Impact,"Arial Narrow",sans-serif;margin:8px 0 4px;letter-spacing:.01em}
+h2{font:700 1.35rem/1.2 "Barlow Condensed","Arial Narrow",sans-serif;margin:0 0 8px}
+.sub{color:var(--muted);margin:0 0 18px;max-width:60ch}
+button,input,select{font:inherit;color:inherit}
+.btn{border:0;border-radius:10px;padding:12px 16px;font-weight:600;cursor:pointer;background:var(--card);border:1px solid var(--line)}
+.btn.primary{background:var(--water);color:#fff;border-color:var(--water);font-size:1.05rem}
+:root[data-theme="dark"] .btn.primary{color:#04141B}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#04141B}}
+.btn:focus-visible,input:focus-visible,.chip:focus-visible,select:focus-visible{outline:3px solid var(--water);outline-offset:2px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row>.grow{flex:1 1 200px}
+input[type=text]{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.sugg{list-style:none;margin:6px 0 0;padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper)}
+.sugg:empty{display:none}
+.sugg li button{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 12px;cursor:pointer}
+.sugg li+li{border-top:1px solid var(--line)}
+.sugg li button:hover{background:var(--water-soft)}
+.radius{display:flex;align-items:center;gap:12px;margin-top:14px}
+.radius input{flex:1;accent-color:var(--water)}
+.radius output{font:700 1.4rem "Barlow Condensed",sans-serif;min-width:4.5ch;text-align:right}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:6px 12px;font-size:.92rem;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--water-soft);border-color:var(--water);color:var(--ink);font-weight:600}
+.status{color:var(--muted);font-size:.95rem;margin:4px 0 0;min-height:1.5em}
+.where{font-weight:600}
+.radar{display:block;width:100%;max-width:420px;margin:0 auto;touch-action:manipulation}
+.radar text{font:600 11px Barlow,sans-serif;fill:var(--muted)}
+.summary{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px;color:var(--muted)}
+.summary b{color:var(--ink);font:700 1.5rem/1 "Barlow Condensed",sans-serif;display:block}
+.list{list-style:none;margin:0;padding:0}
+.item{display:grid;grid-template-columns:44px 1fr auto;gap:12px;padding:14px 0;border-top:1px solid var(--line);align-items:start}
+.item.sel{background:var(--water-soft);margin:0 -16px;padding:14px 16px}
+.ico{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--water-soft)}
+.ico svg{width:24px;height:24px;stroke:var(--water);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.name{font-weight:600;line-height:1.25}
+.meta{color:var(--muted);font-size:.9rem}
+.dist{text-align:right;font:700 1.25rem/1 "Barlow Condensed",sans-serif;white-space:nowrap}
+.dist small{display:block;font:500 .85rem Barlow,sans-serif;color:var(--muted);margin-top:4px}
+.tag{display:inline-block;font-size:.8rem;padding:2px 8px;border-radius:6px;margin:6px 6px 0 0}
+.tag.safe{background:var(--safe-soft);color:var(--safe)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.bad{background:var(--bad-soft);color:var(--bad)}
+.tag.src{background:var(--paper);border:1px solid var(--line);color:var(--muted)}
+.acts{grid-column:2/4;display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.acts a,.acts button{font-size:.88rem;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--paper);color:var(--ink);text-decoration:none;cursor:pointer}
+.empty{padding:20px 0;color:var(--muted)}
+details summary{cursor:pointer;font-weight:600}
+.small{font-size:.9rem;color:var(--muted)}
+.rules{margin:8px 0 0;padding-left:20px}
+.rules li{margin:4px 0}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);max-width:420px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+label{display:block;font-weight:600;margin:10px 0 4px}
+select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+@media (prefers-reduced-motion:no-preference){.pulse{animation:p 2.4s ease-out infinite}@keyframes p{from{r:6;opacity:.7}to{r:22;opacity:0}}}
+.tabs{display:flex;gap:6px;margin:6px 0 10px}
+.tabs button{flex:1;border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:9px;font-weight:600;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--water);border-color:var(--water);color:#fff}
+#map{height:380px;border-radius:12px;border:1px solid var(--line);z-index:0}
+.leaflet-popup-content{font:14px/1.4 Barlow,sans-serif;margin:10px 12px}
+.leaflet-popup-content a{color:var(--water);font-weight:600}
+.offline{display:none;background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:.92rem}
+body.is-offline .offline{display:block}
+#install{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Tubig</h1>
+  <p class="offline">You are offline. Built-in sources and saved areas still work. The map shows only places you viewed before.</p>
+  <p class="sub">Find drinkable-water sources near you: falls, springs, lakes, reservoirs, dams and rivers. Works offline across the Philippines. Directions open in Google Maps.</p>
+
+  <section class="panel" aria-labelledby="h-where">
+    <h2 id="h-where">Where are you?</h2>
+    <div class="row">
+      <button class="btn primary" id="gps">Use my location</button>
+      <button class="btn" id="install">Install app</button>
+      <div class="grow">
+        <input type="text" id="town" placeholder="Or type a town, e.g. Sibalom" autocomplete="off" aria-label="Search town">
+        <ul class="sugg" id="sugg"></ul>
+      </div>
+    </div>
+    <div class="radius">
+      <label for="rad" style="margin:0">Radius</label>
+      <input type="range" id="rad" min="1" max="100" value="15">
+      <output id="radOut">15 km</output>
+    </div>
+    <div class="chips" id="chips" role="group" aria-label="Source types"></div>
+    <p class="status" id="status">Choose your location to start.</p>
+  </section>
+
+  <section class="panel" id="results" hidden aria-labelledby="h-res">
+    <h2 id="h-res">Nearest water</h2>
+    <p class="small where" id="where"></p>
+    <div class="tabs" role="tablist"><button role="tab" id="tMap" aria-selected="true">Map</button><button role="tab" id="tRad" aria-selected="false">Compass (offline)</button></div>
+    <div id="map" role="region" aria-label="Map of water sources"></div>
+    <svg class="radar" id="radar" hidden viewBox="-160 -160 320 320" role="img" aria-label="Compass view of sources around you"></svg>
+    <div class="summary" id="summary"></div>
+    <ul class="list" id="list"></ul>
+    <div class="row" style="margin-top:12px"><button class="btn" id="saveArea">Save this area offline</button><button class="btn" id="addBtn">Save a source I know</button></div>
+  </section>
+
+  <section class="panel">
+    <details>
+      <summary>Make water safe before drinking</summary>
+      <ul class="rules">
+        <li>Clear water can still make you sick. Treat every source except a working tap.</li>
+        <li>Boil: bring to a rolling boil for 1 minute (3 minutes in high mountains).</li>
+        <li>No fire: filter through cloth, let it settle, then use chlorine drops or tablets as labeled and wait 30 minutes.</li>
+        <li>Take from moving water upstream of houses, farms and animals. Avoid green, oily or foul-smelling water.</li>
+        <li>Lagoons and river mouths can be salty. Salt water is not drinkable even after boiling.</li>
+      </ul>
+    </details>
+  </section>
+
+  <section class="panel">
+    <details>
+      <summary>Where the data comes from</summary>
+      <p class="small">Built-in: GeoNames gazetteer for the Philippines, which merges official names from the US NGA geographic names database with local edits. It covers named lakes, reservoirs, dams, falls, springs and about 10,000 rivers and creeks. River points usually mark the mouth, so walk upstream for cleaner water.</p>
+      <p class="small">Live (when online and allowed): OpenStreetMap, mapped by local volunteers, adds springs, wells, public taps and unnamed falls. Sources and areas you save stay on this phone only. Map tiles © OpenStreetMap contributors.</p>
+      <p class="small">Always confirm with the barangay before relying on a source. Some are inside protected watersheds or private land.</p>
+    </details>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog" id="addForm">
+    <h2>Save a source</h2>
+    <p class="small" id="dlgWhere"></p>
+    <label for="sName">Name</label>
+    <input type="text" id="sName" required placeholder="e.g. Lola's spring behind chapel">
+    <label for="sType">Type</label>
+    <select id="sType"></select>
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" value="ok" id="saveBtn">Save</button>
+    </div>
+  </form>
+</dialog>
+<script src="vendor/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
